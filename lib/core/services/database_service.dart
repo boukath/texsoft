@@ -12,7 +12,9 @@ import '../models/user_model.dart';
 import '../models/role_model.dart';
 import '../models/category_model.dart';
 import '../models/product_model.dart';
-import '../models/variant_model.dart'; // We will create this model
+import '../models/variant_model.dart';
+// --- NOUVEL IMPORT ---
+import 'image_service.dart'; // Service pour gérer les fichiers images
 
 class DatabaseService {
   // Singleton pattern
@@ -31,13 +33,26 @@ class DatabaseService {
     final String path = join(appSupportDir.path, filePath);
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, // <-- MODIFIÉ : Version 2
       onCreate: _onCreateDB,
+      onUpgrade: _onUpgradeDB, // <-- AJOUTÉ : Gestionnaire de migration
       // Enable foreign keys
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
     );
+  }
+
+  // --- NOUVELLE FONCTION : Migration de la DB ---
+  Future<void> _onUpgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Si l'ancienne version est 1, ajoutez la colonne imagePath
+      try {
+        await db.execute('ALTER TABLE Products ADD COLUMN imagePath TEXT');
+      } catch (e) {
+        print("Erreur lors de la migration de la table Products: $e");
+      }
+    }
   }
 
   Future<void> _onCreateDB(Database db, int version) async {
@@ -72,7 +87,7 @@ class DatabaseService {
     await _createProductTables(db);
   }
 
-  // --- THIS FUNCTION IS NOW UPDATED FOR VARIANTS ---
+  // --- CETTE FONCTION EST MISE À JOUR ---
   Future<void> _createProductTables(Database db) async {
     // Categories Table (No change)
     await db.execute('''
@@ -82,12 +97,13 @@ class DatabaseService {
       )
     ''');
 
-    // Products Table (REMOVED PRICE)
+    // Products Table (MODIFIÉ : Ajout de imagePath)
     await db.execute('''
       CREATE TABLE Products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
         categoryId INTEGER NOT NULL,
+        imagePath TEXT, 
         FOREIGN KEY (categoryId) REFERENCES Categories (id) ON DELETE CASCADE
       )
     ''');
@@ -250,31 +266,62 @@ class DatabaseService {
   // --- ADMIN PRODUCT & VARIANT CRUD ---
   // ===================================================================
 
-  // --- Create (Base Product) ---
-  Future<void> createProduct(String name, int categoryId) async {
+  // --- NOUVELLE MÉTHODE : Pour obtenir un produit par ID (nécessaire pour la suppression) ---
+  Future<Product?> getProductById(int id) async {
     final db = await instance.database;
-    await db.insert('Products', {
+    final List<Map<String, dynamic>> maps = await db.query(
+      'Products',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isNotEmpty) {
+      return Product.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  // --- Create (Base Product) ---
+  // MODIFIÉ : Accepte imagePath et retourne le nouvel ID
+  Future<int> createProduct(String name, int categoryId, String? imagePath) async {
+    final db = await instance.database;
+    return await db.insert('Products', {
       'name': name,
       'categoryId': categoryId,
+      'imagePath': imagePath, // <-- AJOUTÉ
     });
   }
 
   // --- Update (Base Product) ---
-  Future<void> updateProduct(int id, String newName, int newCategoryId) async {
+  // MODIFIÉ : Accepte newImagePath
+  Future<void> updateProduct(int id, String newName, int newCategoryId, String? newImagePath) async {
     final db = await instance.database;
     await db.update(
       'Products',
-      {'name': newName, 'categoryId': newCategoryId},
+      {
+        'name': newName,
+        'categoryId': newCategoryId,
+        'imagePath': newImagePath, // <-- AJOUTÉ
+      },
       where: 'id = ?',
       whereArgs: [id],
     );
   }
 
   // --- Delete (Base Product) ---
+  // MODIFIÉ : Supprime également l'image associée
   Future<void> deleteProduct(int id) async {
     final db = await instance.database;
-    // ON DELETE CASCADE will handle deleting its variants.
+
+    // 1. Récupérer le produit pour trouver son chemin d'image
+    final product = await getProductById(id);
+
+    // 2. Supprimer le produit de la DB (les variantes sont supprimées en cascade)
     await db.delete('Products', where: 'id = ?', whereArgs: [id]);
+
+    // 3. Supprimer le fichier image du disque (après la suppression de la DB)
+    if (product != null) {
+      await ImageService.instance.deleteImage(product.imagePath);
+    }
   }
 
   // --- Get ALL (Base Products) ---
