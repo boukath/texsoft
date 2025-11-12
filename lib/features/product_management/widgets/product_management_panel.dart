@@ -1,10 +1,10 @@
 // lib/features/product_management/widgets/product_management_panel.dart
-import 'dart:io'; // <-- Assurez-vous que c'est importé
+import 'dart:io'; // <-- N'oubliez pas cet import
 import 'package:flutter/material.dart';
 import '../../../core/models/product_model.dart';
 import '../../../core/models/category_model.dart';
 import '../../../core/services/database_service.dart';
-import '../../../core/services/image_service.dart'; // <-- Assurez-vous que c'est importé
+import '../../../core/services/image_service.dart'; // <-- N'oubliez pas cet import
 
 class ProductManagementPanel extends StatelessWidget {
   final List<Product> products;
@@ -239,8 +239,7 @@ class ProductManagementPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16.0),
       child: Column(
-        // Cette ligne est correcte. C'est ici que l'erreur s'est
-        // probablement produite lors du copier-coller.
+        // C'est ici que la faute de frappe a été corrigée :
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // --- Title Bar ---
@@ -282,13 +281,17 @@ class ProductManagementPanel extends StatelessWidget {
                     leading: Container(
                       width: 40,
                       height: 40,
-                      child: (product.imagePath != null)
-                          ? Image.file(
-                        File(product.imagePath!),
-                        fit: BoxFit.cover,
-                        errorBuilder: (c, e, s) => const Icon(Icons.image_not_supported),
-                      )
-                          : const Icon(Icons.fastfood),
+                      // Ajout d'un ClipRRect pour des bords arrondis
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4.0),
+                        child: (product.imagePath != null)
+                            ? Image.file(
+                          File(product.imagePath!),
+                          fit: BoxFit.cover, // Assure que l'image remplit le cadre
+                          errorBuilder: (c, e, s) => const Icon(Icons.image_not_supported),
+                        )
+                            : const Icon(Icons.fastfood),
+                      ),
                     ),
                     // --- FIN NOUVEAU ---
                     title: Text(product.name),
