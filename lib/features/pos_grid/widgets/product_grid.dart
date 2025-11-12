@@ -26,10 +26,10 @@ class ProductGrid extends StatelessWidget {
     return GridView.builder(
       padding: const EdgeInsets.all(16.0),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4, // Adjust count for screen size
+        crossAxisCount: 4,
         crossAxisSpacing: 12.0,
         mainAxisSpacing: 12.0,
-        childAspectRatio: 1.0, // Makes the tiles square
+        childAspectRatio: 1.0,
       ),
       itemCount: products.length,
       itemBuilder: (context, index) {
@@ -49,7 +49,6 @@ class ProductGrid extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // We can add an Icon or Image here later
                   const Icon(Icons.fastfood, size: 40, color: Colors.white70),
                   const Spacer(),
                   Text(
@@ -63,11 +62,13 @@ class ProductGrid extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    '${product.price.toStringAsFixed(2)} €', // French currency
-                    style: const TextStyle(
+
+                  // --- FIX: Replaced Price with Variant Text ---
+                  const Text(
+                    'Voir variantes', // "See variants"
+                    style: TextStyle(
                       color: Colors.blueAccent,
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

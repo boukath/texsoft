@@ -58,9 +58,11 @@ class CartPanel extends StatelessWidget {
               itemBuilder: (context, index) {
                 final item = cart[index];
                 return ListTile(
-                  title: Text(item.product.name),
+                  // --- FIX: Show product name AND variant name ---
+                  title: Text('${item.product.name} (${item.variant.name})'),
                   subtitle: Text(
-                    'Qté: ${item.quantity}  @  ${item.product.price.toStringAsFixed(2)} €',
+                    // --- FIX: Use variant.price ---
+                    'Qté: ${item.quantity}  @  ${item.variant.price.toStringAsFixed(2)} €',
                   ),
                   trailing: Text(
                     '${item.totalPrice.toStringAsFixed(2)} €',

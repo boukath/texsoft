@@ -1,62 +1,64 @@
 // lib/features/product_management/widgets/product_management_panel.dart
 import 'package:flutter/material.dart';
-import '../../../core/models/category_model.dart';
 import '../../../core/models/product_model.dart';
+import '../../../core/models/category_model.dart';
 import '../../../core/services/database_service.dart';
 
 class ProductManagementPanel extends StatelessWidget {
   final List<Product> products;
-  final Future<List<Category>> categoriesFuture; // To populate dropdown
+  final int? selectedProductId;
+  final Function(int) onProductSelected;
   final VoidCallback onDataChanged;
+  final List<Category> allCategories;
+  final int? selectedCategoryId; // The currently selected category
 
   const ProductManagementPanel({
     Key? key,
     required this.products,
-    required this.categoriesFuture,
+    required this.selectedProductId,
+    required this.onProductSelected,
     required this.onDataChanged,
+    required this.allCategories,
+    required this.selectedCategoryId,
   }) : super(key: key);
 
-  // --- Show Add/Edit Dialog ---
-  void _showProductDialog(BuildContext context, List<Category> categories, {Product? product}) {
+  // --- Show Add/Edit Dialog (for Base Product) ---
+  void _showProductDialog(BuildContext context, {Product? product}) {
     final _nameController = TextEditingController(text: product?.name ?? '');
-    final _priceController = TextEditingController(text: product?.price.toString() ?? '');
-    int? _selectedCategoryId = product?.categoryId;
     final _formKey = GlobalKey<FormState>();
     final bool isEditing = product != null;
 
-    if (categories.isEmpty) {
+    // Set the initial category in the dropdown
+    int? _dialogSelectedCategoryId = isEditing
+        ? product.categoryId
+        : (allCategories.any((c) => c.id == selectedCategoryId)
+        ? selectedCategoryId
+        : null);
+
+    // Error if no categories exist
+    if (allCategories.isEmpty) {
       showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Erreur'),
             content: const Text('Vous devez d\'abord créer une catégorie avant d\'ajouter un produit.'),
-            actions: [
-              TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))
-            ],
+            actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))],
           ));
       return;
-    }
-
-    // Set default category if not editing
-    if (!isEditing) {
-      _selectedCategoryId = categories.first.id;
     }
 
     showDialog(
       context: context,
       builder: (context) {
-        // Use StatefulBuilder to update the dropdown inside the dialog
         return StatefulBuilder(
-          builder: (context, setStateInDialog) {
-            return AlertDialog(
-              title: Text(isEditing ? 'Modifier le produit' : 'Ajouter un produit'),
-              content: Form(
-                key: _formKey,
-                child: SingleChildScrollView(
+            builder: (context, setStateInDialog) {
+              return AlertDialog(
+                title: Text(isEditing ? 'Modifier le produit' : 'Ajouter un produit'),
+                content: Form(
+                  key: _formKey,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // --- Name ---
                       TextFormField(
                         controller: _nameController,
                         decoration: const InputDecoration(labelText: 'Nom du produit'),
@@ -66,24 +68,9 @@ class ProductManagementPanel extends StatelessWidget {
                         },
                       ),
                       const SizedBox(height: 16),
-
-                      // --- Price ---
-                      TextFormField(
-                        controller: _priceController,
-                        decoration: const InputDecoration(labelText: 'Prix (€)'),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) return 'Veuillez entrer un prix';
-                          if (double.tryParse(value) == null) return 'Veuillez entrer un nombre valide';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // --- Category ---
                       DropdownButtonFormField<int>(
-                        value: _selectedCategoryId,
-                        items: categories.map((cat) {
+                        value: _dialogSelectedCategoryId,
+                        items: allCategories.map((cat) {
                           return DropdownMenuItem<int>(
                             value: cat.id,
                             child: Text(cat.name),
@@ -92,7 +79,7 @@ class ProductManagementPanel extends StatelessWidget {
                         onChanged: (value) {
                           if (value != null) {
                             setStateInDialog(() {
-                              _selectedCategoryId = value;
+                              _dialogSelectedCategoryId = value;
                             });
                           }
                         },
@@ -105,36 +92,34 @@ class ProductManagementPanel extends StatelessWidget {
                     ],
                   ),
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Annuler'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
-                      final name = _nameController.text;
-                      final price = double.parse(_priceController.text);
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Annuler'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (_formKey.currentState!.validate()) {
+                        final name = _nameController.text;
 
-                      if (isEditing) {
-                        await DatabaseService.instance.updateProduct(
-                          product.id, name, price, _selectedCategoryId!,
-                        );
-                      } else {
-                        await DatabaseService.instance.createProduct(
-                          name, price, _selectedCategoryId!,
-                        );
+                        if (isEditing) {
+                          await DatabaseService.instance.updateProduct(
+                            product.id, name, _dialogSelectedCategoryId!,
+                          );
+                        } else {
+                          await DatabaseService.instance.createProduct(
+                            name, _dialogSelectedCategoryId!,
+                          );
+                        }
+                        onDataChanged(); // Reload all data
+                        Navigator.of(context).pop();
                       }
-                      onDataChanged(); // Reload data
-                      Navigator.of(context).pop();
-                    }
-                  },
-                  child: Text(isEditing ? 'Mettre à jour' : 'Créer'),
-                ),
-              ],
-            );
-          },
+                    },
+                    child: Text(isEditing ? 'Mettre à jour' : 'Créer'),
+                  ),
+                ],
+              );
+            }
         );
       },
     );
@@ -146,7 +131,7 @@ class ProductManagementPanel extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmer la suppression'),
-        content: Text('Voulez-vous vraiment supprimer le produit "${product.name}" ?'),
+        content: Text('Voulez-vous vraiment supprimer le produit "${product.name}" ?\n\nTOUTES ses variantes (ex: 1L, 0.5L) seront aussi supprimées.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -181,19 +166,13 @@ class ProductManagementPanel extends StatelessWidget {
                 'Produits',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              // We need to load categories before we can add a product
-              FutureBuilder<List<Category>>(
-                future: categoriesFuture,
-                builder: (context, snapshot) {
-                  return IconButton(
-                    icon: const Icon(Icons.add_circle, color: Colors.green),
-                    tooltip: 'Ajouter un produit',
-                    onPressed: () {
-                      final categories = snapshot.data ?? [];
-                      _showProductDialog(context, categories);
-                    },
-                  );
-                },
+              IconButton(
+                icon: const Icon(Icons.add_circle, color: Colors.green),
+                tooltip: 'Ajouter un produit',
+                // Disable 'Add' if no category is selected or no categories exist
+                onPressed: selectedCategoryId == null
+                    ? null
+                    : () => _showProductDialog(context),
               ),
             ],
           ),
@@ -202,26 +181,26 @@ class ProductManagementPanel extends StatelessWidget {
           // --- List of Products ---
           Expanded(
             child: products.isEmpty
-                ? const Center(child: Text('Aucun produit trouvé.'))
+                ? const Center(child: Text('Aucun produit dans cette catégorie.'))
                 : ListView.builder(
               itemCount: products.length,
               itemBuilder: (context, index) {
                 final product = products[index];
+                final bool isSelected = product.id == selectedProductId;
+
                 return Card(
-                  color: Theme.of(context).inputDecorationTheme.fillColor,
+                  color: isSelected
+                      ? Colors.blueAccent.withOpacity(0.3)
+                      : Theme.of(context).inputDecorationTheme.fillColor,
                   child: ListTile(
                     title: Text(product.name),
-                    subtitle: Text('${product.price.toStringAsFixed(2)} €'),
+                    onTap: () => onProductSelected(product.id),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
                           icon: const Icon(Icons.edit_outlined, color: Colors.blueAccent),
-                          onPressed: () async {
-                            // We must have the category list to show the dialog
-                            final categories = await categoriesFuture;
-                            _showProductDialog(context, categories, product: product);
-                          },
+                          onPressed: () => _showProductDialog(context, product: product),
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete_outline, color: Colors.redAccent),

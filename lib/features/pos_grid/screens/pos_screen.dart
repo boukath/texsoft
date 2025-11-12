@@ -1,18 +1,15 @@
 // lib/features/pos_grid/screens/pos_screen.dart
 import 'package:flutter/material.dart';
-
-// --- CORE MODEL IMPORTS ---
 import '../../../core/models/cart_item_model.dart';
 import '../../../core/models/category_model.dart';
 import '../../../core/models/product_model.dart';
+import '../../../core/models/variant_model.dart'; // <-- Need this
 import '../../../core/models/user_model.dart';
 import '../../../core/models/role_model.dart';
 import '../../../core/services/database_service.dart';
-
-// --- WIDGET IMPORTS ---
 import '../widgets/cart_panel.dart';
 import '../widgets/category_tabs.dart';
-import '../widgets/product_grid.dart'; // <-- THE IMPORT
+import '../widgets/product_grid.dart';
 
 class PosScreen extends StatefulWidget {
   final User loggedInUser;
@@ -38,11 +35,9 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    // 1. Get categories
     _categoriesFuture = DatabaseService.instance.getCategories();
     final categories = await _categoriesFuture;
 
-    // 2. If categories exist, load products for the first one
     if (categories.isNotEmpty) {
       _loadProducts(categories.first.id);
     } else {
@@ -70,11 +65,33 @@ class _PosScreenState extends State<PosScreen> {
     _loadProducts(categoryId);
   }
 
-  void _onProductTapped(Product product) {
+  // --- THIS IS THE NEW LOGIC FOR TAPPING A PRODUCT ---
+  void _onProductTapped(Product product) async {
+    // 1. Fetch variants for this product
+    final variants = await DatabaseService.instance.getVariantsForProduct(product.id);
+
+    if (variants.isEmpty) {
+      // No variants found (should not happen, but good to check)
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aucune variante trouvée pour ce produit.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    if (variants.length == 1) {
+      // 2. If only one variant, add it directly (no pop-up)
+      _addVariantToCart(product, variants.first);
+    } else {
+      // 3. If multiple variants, show a selection dialog
+      _showVariantSelectionDialog(product, variants);
+    }
+  }
+
+  void _addVariantToCart(Product product, Variant variant) {
     setState(() {
-      // Check if product is already in cart
+      // Check if this *exact variant* is already in cart
       final existingItemIndex = _cart.indexWhere(
-              (item) => item.product.id == product.id
+              (item) => item.variant.id == variant.id
       );
 
       if (existingItemIndex != -1) {
@@ -82,10 +99,47 @@ class _PosScreenState extends State<PosScreen> {
         _cart[existingItemIndex].quantity++;
       } else {
         // If no, add new CartItem
-        _cart.add(CartItem(product: product));
+        // --- FIX: This is the line that had the error ---
+        _cart.add(CartItem(product: product, variant: variant));
       }
     });
   }
+
+  void _showVariantSelectionDialog(Product product, List<Variant> variants) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Choisir une variante pour: ${product.name}'),
+          content: Container(
+            width: double.minPositive,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: variants.length,
+              itemBuilder: (context, index) {
+                final variant = variants[index];
+                return ListTile(
+                  title: Text(variant.name),
+                  trailing: Text('${variant.price.toStringAsFixed(2)} €'),
+                  onTap: () {
+                    _addVariantToCart(product, variant);
+                    Navigator.of(context).pop(); // Close the dialog
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Annuler'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  // --- END OF NEW LOGIC ---
 
   void _onClearCart() {
     setState(() {
@@ -132,6 +186,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
       body: Row(
         children: [
+          // --- Left Side: Product Selection ---
           Expanded(
             flex: 2,
             child: Column(
@@ -156,10 +211,11 @@ class _PosScreenState extends State<PosScreen> {
                   },
                 ),
 
+                // --- Product Grid ---
                 Expanded(
                   child: _isLoadingProducts
                       ? const Center(child: CircularProgressIndicator())
-                      : ProductGrid( // <-- This is the line (168)
+                      : ProductGrid(
                     products: _products,
                     onProductTapped: _onProductTapped,
                   ),
@@ -170,6 +226,7 @@ class _PosScreenState extends State<PosScreen> {
 
           const VerticalDivider(width: 1),
 
+          // --- Right Side: Cart ---
           Expanded(
             flex: 1,
             child: CartPanel(

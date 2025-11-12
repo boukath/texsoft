@@ -5,11 +5,15 @@ import '../../../core/services/database_service.dart';
 
 class CategoryManagementPanel extends StatelessWidget {
   final List<Category> categories;
+  final int? selectedCategoryId;
+  final Function(int) onCategorySelected;
   final VoidCallback onDataChanged;
 
   const CategoryManagementPanel({
     Key? key,
     required this.categories,
+    required this.selectedCategoryId,
+    required this.onCategorySelected,
     required this.onDataChanged,
   }) : super(key: key);
 
@@ -51,7 +55,7 @@ class CategoryManagementPanel extends StatelessWidget {
                   } else {
                     await DatabaseService.instance.createCategory(name);
                   }
-                  onDataChanged(); // Reload data on the main screen
+                  onDataChanged(); // Reload all data on the main screen
                   Navigator.of(context).pop();
                 }
               },
@@ -143,10 +147,15 @@ class CategoryManagementPanel extends StatelessWidget {
               itemCount: categories.length,
               itemBuilder: (context, index) {
                 final category = categories[index];
+                final bool isSelected = category.id == selectedCategoryId;
+
                 return Card(
-                  color: Theme.of(context).inputDecorationTheme.fillColor,
+                  color: isSelected
+                      ? Colors.blueAccent.withOpacity(0.3)
+                      : Theme.of(context).inputDecorationTheme.fillColor,
                   child: ListTile(
                     title: Text(category.name),
+                    onTap: () => onCategorySelected(category.id),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

@@ -5,13 +5,14 @@ import 'package:path/path.dart';
 import 'dart:io'; // For Directory
 import 'dart:convert'; // For utf8
 import 'package:crypto/crypto.dart'; // For sha256
-import 'package:sqflite/sqflite.dart'; // --- THIS IS THE FIX FOR ERROR 3 ---
+import 'package:sqflite/sqflite.dart';
 
 // Model Imports
 import '../models/user_model.dart';
 import '../models/role_model.dart';
 import '../models/category_model.dart';
 import '../models/product_model.dart';
+import '../models/variant_model.dart'; // We will create this model
 
 class DatabaseService {
   // Singleton pattern
@@ -32,6 +33,10 @@ class DatabaseService {
       path,
       version: 1,
       onCreate: _onCreateDB,
+      // Enable foreign keys
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+      },
     );
   }
 
@@ -67,8 +72,9 @@ class DatabaseService {
     await _createProductTables(db);
   }
 
+  // --- THIS FUNCTION IS NOW UPDATED FOR VARIANTS ---
   Future<void> _createProductTables(Database db) async {
-    // Categories
+    // Categories Table (No change)
     await db.execute('''
       CREATE TABLE Categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,26 +82,49 @@ class DatabaseService {
       )
     ''');
 
-    // Products
+    // Products Table (REMOVED PRICE)
     await db.execute('''
       CREATE TABLE Products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
-        price REAL NOT NULL,
         categoryId INTEGER NOT NULL,
-        FOREIGN KEY (categoryId) REFERENCES Categories (id)
+        FOREIGN KEY (categoryId) REFERENCES Categories (id) ON DELETE CASCADE
       )
     ''');
 
-    // Default Data
+    // --- NEW TABLE: Variants ---
+    await db.execute('''
+      CREATE TABLE Variants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        productId INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        price REAL NOT NULL,
+        FOREIGN KEY (productId) REFERENCES Products (id) ON DELETE CASCADE
+      )
+    ''');
+
+    // --- Insert Default Categories ---
     int catBoissonsId = await db.insert('Categories', {'name': 'Boissons'});
     int catSandwichsId = await db.insert('Categories', {'name': 'Sandwichs'});
     int catDessertsId = await db.insert('Categories', {'name': 'Desserts'});
 
-    await db.insert('Products', {'name': 'Coca-Cola', 'price': 2.50, 'categoryId': catBoissonsId});
-    await db.insert('Products', {'name': 'Eau Minérale', 'price': 1.50, 'categoryId': catBoissonsId});
-    await db.insert('Products', {'name': 'Sandwich Poulet', 'price': 5.50, 'categoryId': catSandwichsId});
-    await db.insert('Products', {'name': 'Tarte au Citron', 'price': 3.50, 'categoryId': catDessertsId});
+    // --- Insert Default Products (Base) ---
+    int prodCocaId = await db.insert('Products', {'name': 'Coca-Cola', 'categoryId': catBoissonsId});
+    int prodEauId = await db.insert('Products', {'name': 'Eau Minérale', 'categoryId': catBoissonsId});
+    int prodPaniniId = await db.insert('Products', {'name': 'Panini 3 Fromages', 'categoryId': catSandwichsId});
+    int prodTarteId = await db.insert('Products', {'name': 'Tarte au Citron', 'categoryId': catDessertsId});
+
+    // --- Insert Default Variants ---
+    // Coca-Cola Variants
+    await db.insert('Variants', {'productId': prodCocaId, 'name': '0.5L', 'price': 2.50});
+    await db.insert('Variants', {'productId': prodCocaId, 'name': '1L', 'price': 3.50});
+    // Eau Minérale Variants
+    await db.insert('Variants', {'productId': prodEauId, 'name': '50cl', 'price': 1.50});
+    // Panini Variants
+    await db.insert('Variants', {'productId': prodPaniniId, 'name': 'Demi', 'price': 4.00});
+    await db.insert('Variants', {'productId': prodPaniniId, 'name': 'Entier', 'price': 6.00});
+    // Tarte Variants
+    await db.insert('Variants', {'productId': prodTarteId, 'name': 'Part', 'price': 3.50});
   }
 
   String _hashPassword(String password) {
@@ -105,7 +134,7 @@ class DatabaseService {
   }
 
   // ===================================================================
-  // --- USER METHODS ---
+  // --- USER METHODS (No Change) ---
   // ===================================================================
 
   Future<User?> validateLogin(String username, String password) async {
@@ -115,17 +144,6 @@ class DatabaseService {
       'Users',
       where: 'username = ? AND hashedPassword = ?',
       whereArgs: [username, hashedPassword],
-    );
-    if (maps.isNotEmpty) return User.fromMap(maps.first);
-    return null;
-  }
-
-  Future<User?> getUserByUsername(String username) async {
-    final db = await instance.database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'Users',
-      where: 'username = ?',
-      whereArgs: [username],
     );
     if (maps.isNotEmpty) return User.fromMap(maps.first);
     return null;
@@ -155,6 +173,17 @@ class DatabaseService {
     await db.delete('Users', where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<User?> getUserByUsername(String username) async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'Users',
+      where: 'username = ?',
+      whereArgs: [username],
+    );
+    if (maps.isNotEmpty) return User.fromMap(maps.first);
+    return null;
+  }
+
   // ===================================================================
   // --- POS METHODS ---
   // ===================================================================
@@ -165,6 +194,7 @@ class DatabaseService {
     return List.generate(maps.length, (i) => Category.fromMap(maps[i]));
   }
 
+  // --- UPDATED to get base products ---
   Future<List<Product>> getProductsByCategory(int categoryId) async {
     final db = await instance.database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -175,8 +205,19 @@ class DatabaseService {
     return List.generate(maps.length, (i) => Product.fromMap(maps[i]));
   }
 
+  // --- NEW: Get variants for a specific product ---
+  Future<List<Variant>> getVariantsForProduct(int productId) async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'Variants',
+      where: 'productId = ?',
+      whereArgs: [productId],
+    );
+    return List.generate(maps.length, (i) => Variant.fromMap(maps[i]));
+  }
+
   // ===================================================================
-  // --- ADMIN CATEGORY CRUD METHODS ---
+  // --- ADMIN CATEGORY CRUD (Small Update) ---
   // ===================================================================
 
   Future<void> createCategory(String name) async {
@@ -191,50 +232,82 @@ class DatabaseService {
 
   Future<void> deleteCategory(int id) async {
     final db = await instance.database;
+    // ON DELETE CASCADE in the 'Products' table will handle deleting products.
     await db.delete('Categories', where: 'id = ?', whereArgs: [id]);
   }
 
+  // --- UPDATED to check Products, not Variants ---
   Future<int> getProductCountForCategory(int categoryId) async {
     final db = await instance.database;
     final result = await db.rawQuery(
       'SELECT COUNT(*) FROM Products WHERE categoryId = ?',
       [categoryId],
     );
-    // --- THIS LINE IS NOW FIXED ---
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
   // ===================================================================
-  // --- ADMIN PRODUCT CRUD METHODS ---
+  // --- ADMIN PRODUCT & VARIANT CRUD ---
   // ===================================================================
 
-  Future<void> createProduct(String name, double price, int categoryId) async {
+  // --- Create (Base Product) ---
+  Future<void> createProduct(String name, int categoryId) async {
     final db = await instance.database;
     await db.insert('Products', {
       'name': name,
-      'price': price,
       'categoryId': categoryId,
     });
   }
 
-  Future<void> updateProduct(int id, String newName, double newPrice, int newCategoryId) async {
+  // --- Update (Base Product) ---
+  Future<void> updateProduct(int id, String newName, int newCategoryId) async {
     final db = await instance.database;
     await db.update(
       'Products',
-      {'name': newName, 'price': newPrice, 'categoryId': newCategoryId},
+      {'name': newName, 'categoryId': newCategoryId},
       where: 'id = ?',
       whereArgs: [id],
     );
   }
 
+  // --- Delete (Base Product) ---
   Future<void> deleteProduct(int id) async {
     final db = await instance.database;
+    // ON DELETE CASCADE will handle deleting its variants.
     await db.delete('Products', where: 'id = ?', whereArgs: [id]);
   }
 
+  // --- Get ALL (Base Products) ---
   Future<List<Product>> getAllProducts() async {
     final db = await instance.database;
     final List<Map<String, dynamic>> maps = await db.query('Products');
     return List.generate(maps.length, (i) => Product.fromMap(maps[i]));
+  }
+
+  // --- NEW: Create Variant ---
+  Future<void> createVariant(int productId, String name, double price) async {
+    final db = await instance.database;
+    await db.insert('Variants', {
+      'productId': productId,
+      'name': name,
+      'price': price,
+    });
+  }
+
+  // --- NEW: Update Variant ---
+  Future<void> updateVariant(int id, String newName, double newPrice) async {
+    final db = await instance.database;
+    await db.update(
+      'Variants',
+      {'name': newName, 'price': newPrice},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // --- NEW: Delete Variant ---
+  Future<void> deleteVariant(int id) async {
+    final db = await instance.database;
+    await db.delete('Variants', where: 'id = ?', whereArgs: [id]);
   }
 }
