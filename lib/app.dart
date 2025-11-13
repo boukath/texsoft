@@ -10,9 +10,9 @@ class PosApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'POS Pro',
-      debugShowCheckedModeBanner: false, // Hides the "debug" banner
-      theme: AppTheme.darkTheme, // Using our centralized theme
-      home: const LoginScreen(), // The new starting screen
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme, // <--- UPDATED: Changed to lightTheme
+      home: const LoginScreen(),
     );
   }
 }

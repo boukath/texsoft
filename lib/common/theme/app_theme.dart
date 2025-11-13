@@ -2,45 +2,44 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Private constructor so no one can instantiate this class
   AppTheme._();
 
+  // Colors
+  static const Color primaryColor = Color(0xFFFF6B6B);
+  static const Color backgroundColor = Color(0xFFF8F9FD);
+  static const Color sidebarColor = Colors.white;
+  static const Color textDark = Color(0xFF2D2D2D);
+  static const Color textLight = Color(0xFF888888);
+
+  // Light Theme (The one we want)
+  static ThemeData get lightTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      primaryColor: primaryColor,
+      scaffoldBackgroundColor: backgroundColor,
+      fontFamily: 'Poppins',
+
+      // We handle card styling in the widgets directly to avoid build errors
+      cardColor: Colors.white,
+
+      textTheme: const TextTheme(
+        headlineSmall: TextStyle(color: textDark, fontWeight: FontWeight.bold),
+        titleMedium: TextStyle(color: textDark, fontWeight: FontWeight.w600),
+        bodyMedium: TextStyle(color: textLight),
+      ),
+
+      iconTheme: const IconThemeData(color: textLight),
+    );
+  }
+
+  // Dark Theme (Fallback to prevent errors if referenced)
   static ThemeData get darkTheme {
     return ThemeData(
+      useMaterial3: true,
       brightness: Brightness.dark,
-      primarySwatch: Colors.blue,
-      primaryColor: Colors.blueAccent,
-      fontFamily: 'Roboto', // A clean, professional font
-      scaffoldBackgroundColor: const Color(0xFF1a1a2e), // Dark background
-
-      // Define the text field theme globally
-      inputDecorationTheme: InputDecorationTheme(
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
-        prefixIconColor: Colors.white.withOpacity(0.7),
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.15),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10.0),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10.0),
-          borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
-        ),
-      ),
-
-      // Define the elevated button theme
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blueAccent, // Accent color
-          foregroundColor: Colors.white, // Text color
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10.0),
-          ),
-          textStyle: const TextStyle(fontSize: 18),
-        ),
-      ),
+      primaryColor: primaryColor,
+      scaffoldBackgroundColor: const Color(0xFF1a1a2e),
     );
   }
 }
