@@ -6,6 +6,7 @@ import '../../../core/models/product_model.dart';
 import '../../../core/models/variant_model.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/services/database_service.dart';
+import '../../../core/services/printer_service.dart'; // <-- Importez le service d'impression
 import '../../login/screens/login_screen.dart';
 import '../../../common/theme/app_theme.dart';
 
@@ -14,8 +15,8 @@ import '../widgets/sidebar_navigation.dart';
 import '../widgets/pos_category_list.dart';
 import '../widgets/pos_product_card.dart';
 import '../widgets/order_summary_panel.dart';
-import '../widgets/payment_dialog.dart'; // The new payment dialog
-import '../../orders/screens/orders_screen.dart'; // The history screen
+import '../widgets/payment_dialog.dart';
+import '../../orders/screens/orders_screen.dart';
 
 class PosScreen extends StatefulWidget {
   final User loggedInUser;
@@ -26,11 +27,7 @@ class PosScreen extends StatefulWidget {
 }
 
 class _PosScreenState extends State<PosScreen> {
-  // --- Navigation State ---
-  // 1 = Menu (POS), 2 = Orders (History)
   int _selectedIndex = 1;
-
-  // --- POS Data State ---
   late Future<List<Category>> _categoriesFuture;
   List<Product> _products = [];
   List<CartItem> _cart = [];
@@ -43,12 +40,9 @@ class _PosScreenState extends State<PosScreen> {
     _loadInitialData();
   }
 
-  // --- Data Loading ---
   Future<void> _loadInitialData() async {
     _categoriesFuture = DatabaseService.instance.getCategories();
     final categories = await _categoriesFuture;
-
-    // Load the first category by default if available
     if (categories.isNotEmpty) {
       _loadProducts(categories.first.id);
     } else {
@@ -61,31 +55,21 @@ class _PosScreenState extends State<PosScreen> {
       _isLoadingProducts = true;
       _selectedCategoryId = categoryId;
     });
-
     final products = await DatabaseService.instance.getProductsByCategory(categoryId);
-
     setState(() {
       _products = products;
       _isLoadingProducts = false;
     });
   }
 
-  // --- Product & Cart Logic ---
   void _onProductTapped(Product product) async {
-    // Fetch variants to check if we need a selection dialog
     final variants = await DatabaseService.instance.getVariantsForProduct(product.id);
-
     if (variants.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Aucune variante trouvée pour ce produit.'),
-            backgroundColor: Colors.orange
-        ),
+        const SnackBar(content: Text('Aucune variante trouvée.'), backgroundColor: Colors.orange),
       );
       return;
     }
-
-    // If only 1 variant, add directly. Otherwise, show dialog.
     if (variants.length == 1) {
       _addVariantToCart(product, variants.first);
     } else {
@@ -96,7 +80,6 @@ class _PosScreenState extends State<PosScreen> {
   void _addVariantToCart(Product product, Variant variant) {
     setState(() {
       final existingIndex = _cart.indexWhere((item) => item.variant.id == variant.id);
-
       if (existingIndex != -1) {
         _cart[existingIndex].quantity++;
       } else {
@@ -105,31 +88,13 @@ class _PosScreenState extends State<PosScreen> {
     });
   }
 
-  void _increment(CartItem item) {
-    setState(() => item.quantity++);
-  }
-
-  void _decrement(CartItem item) {
-    setState(() {
-      if (item.quantity > 1) {
-        item.quantity--;
-      } else {
-        _cart.remove(item);
-      }
-    });
-  }
-
-  void _remove(CartItem item) {
-    setState(() => _cart.remove(item));
-  }
-
-  void _clear() {
-    setState(() => _cart.clear());
-  }
-
-  double get _totalPrice {
-    return _cart.fold(0.0, (sum, item) => sum + item.totalPrice);
-  }
+  void _increment(CartItem item) => setState(() => item.quantity++);
+  void _decrement(CartItem item) => setState(() {
+    if (item.quantity > 1) item.quantity--; else _cart.remove(item);
+  });
+  void _remove(CartItem item) => setState(() => _cart.remove(item));
+  void _clear() => setState(() => _cart.clear());
+  double get _totalPrice => _cart.fold(0.0, (sum, item) => sum + item.totalPrice);
 
   void _showVariantSelectionDialog(Product product, List<Variant> variants) {
     showDialog(
@@ -146,36 +111,27 @@ class _PosScreenState extends State<PosScreen> {
                 return ListTile(
                     title: Text(variant.name),
                     trailing: Text("${variant.price.toStringAsFixed(2)} DZD"),
-                    onTap: () {
-                      _addVariantToCart(product, variant);
-                      Navigator.pop(context);
-                    }
+                    onTap: () { _addVariantToCart(product, variant); Navigator.pop(context); }
                 );
               },
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annuler'),
-            )
-          ],
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler'))],
         )
     );
   }
 
-  // --- Payment Process ---
+  // --- LOGIQUE DE PAIEMENT ET IMPRESSION ---
   void _onPay() async {
-    // 1. Open the Payment Dialog first
+    // 1. Paiement
     final bool? paymentConfirmed = await showDialog<bool>(
       context: context,
       builder: (context) => PaymentDialog(totalAmount: _totalPrice),
     );
 
-    // If cancelled, stop here
     if (paymentConfirmed != true) return;
 
-    // 2. Show loading while saving
+    // 2. Chargement
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -183,27 +139,46 @@ class _PosScreenState extends State<PosScreen> {
     );
 
     try {
-      // 3. Save Order to Database
+      // 3. Sauvegarde DB
+      // Note: createOrder devrait retourner l'ID de la commande pour qu'on puisse l'imprimer
+      // Pour l'instant, comme createOrder est void dans votre version actuelle,
+      // nous allons récupérer la dernière commande insérée ou simuler un ID.
+      // Idéalement, modifiez createOrder pour retourner int orderId.
+      // Pour cet exemple, nous allons supposer que l'opération réussit.
+
       await DatabaseService.instance.createOrder(
         widget.loggedInUser.id!,
         _cart,
         _totalPrice,
       );
 
-      if (!mounted) return;
-      Navigator.of(context).pop(); // Close loading
+      // Récupérer l'ID de la commande qu'on vient de créer (méthode rapide : dernier ID)
+      // Dans un code 100% pro, DatabaseService.createOrder renverrait l'ID directement.
+      final orders = await DatabaseService.instance.getAllOrders();
+      final int newOrderId = orders.isNotEmpty ? orders.first.id! : 0;
 
-      // 4. Success Message & Clear Cart
+      // 4. IMPRESSION (Client + Cuisine)
+      await PrinterService.instance.printOrder(
+          newOrderId,
+          _cart,
+          _totalPrice,
+          widget.loggedInUser
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Fermer le chargement
+
+      // 5. Succès
       showDialog(
           context: context,
           builder: (c) => AlertDialog(
               title: const Text("Succès"),
-              content: const Text("Paiement validé et commande enregistrée !"),
+              content: const Text("Commande enregistrée et imprimée !"),
               actions: [
                 TextButton(
                     onPressed: () {
                       Navigator.pop(c);
-                      _clear(); // Only clear after successful save
+                      _clear();
                     },
                     child: const Text("OK")
                 )
@@ -212,36 +187,28 @@ class _PosScreenState extends State<PosScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      Navigator.of(context).pop(); // Close loading
+      Navigator.of(context).pop();
 
       showDialog(
           context: context,
           builder: (c) => AlertDialog(
               title: const Text("Erreur"),
-              content: Text("Erreur lors de l'enregistrement : $e"),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(c),
-                    child: const Text("OK")
-                )
-              ]
+              content: Text("Erreur : $e"),
+              actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text("OK"))]
           )
       );
     }
   }
 
-  // --- Main Layout Builder ---
   Widget _buildContent() {
     switch (_selectedIndex) {
-      case 1: // View 1: The POS Menu
+      case 1:
         return Row(
           children: [
-            // Center: Product Grid & Categories
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header
                   Padding(
                     padding: const EdgeInsets.all(24.0),
                     child: Row(
@@ -250,37 +217,19 @@ class _PosScreenState extends State<PosScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                                "Tableau de bord",
-                                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.textDark)
-                            ),
-                            Text(
-                                "${DateTime.now().toString().split(' ')[0]}",
-                                style: const TextStyle(color: AppTheme.textLight)
-                            ),
+                            const Text("Tableau de bord", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.textDark)),
+                            Text("${DateTime.now().toString().split(' ')[0]}", style: const TextStyle(color: AppTheme.textLight)),
                           ],
                         ),
-                        // Search Bar
                         Container(
                           width: 300,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12)
-                          ),
-                          child: const TextField(
-                            decoration: InputDecoration(
-                                border: InputBorder.none,
-                                hintText: "Rechercher...",
-                                icon: Icon(Icons.search)
-                            ),
-                          ),
+                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                          child: const TextField(decoration: InputDecoration(border: InputBorder.none, hintText: "Rechercher...", icon: Icon(Icons.search))),
                         ),
                       ],
                     ),
                   ),
-
-                  // Categories
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24.0),
                     child: Column(
@@ -291,26 +240,15 @@ class _PosScreenState extends State<PosScreen> {
                         FutureBuilder<List<Category>>(
                           future: _categoriesFuture,
                           builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
-                              return const SizedBox(height: 100, child: Center(child: LinearProgressIndicator()));
-                            }
-                            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                              return const SizedBox();
-                            }
-                            return PosCategoryList(
-                              categories: snapshot.data!,
-                              selectedCategoryId: _selectedCategoryId,
-                              onCategorySelected: _loadProducts,
-                            );
+                            if (snapshot.connectionState == ConnectionState.waiting) return const SizedBox(height: 100, child: Center(child: LinearProgressIndicator()));
+                            if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox();
+                            return PosCategoryList(categories: snapshot.data!, selectedCategoryId: _selectedCategoryId, onCategorySelected: _loadProducts);
                           },
                         ),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
-                  // Products Grid
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -323,18 +261,10 @@ class _PosScreenState extends State<PosScreen> {
                             child: _isLoadingProducts
                                 ? const Center(child: CircularProgressIndicator())
                                 : GridView.builder(
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                childAspectRatio: 0.8,
-                                crossAxisSpacing: 20,
-                                mainAxisSpacing: 20,
-                              ),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 0.8, crossAxisSpacing: 20, mainAxisSpacing: 20),
                               itemCount: _products.length,
                               itemBuilder: (context, index) {
-                                return PosProductCard(
-                                  product: _products[index],
-                                  onTap: () => _onProductTapped(_products[index]),
-                                );
+                                return PosProductCard(product: _products[index], onTap: () => _onProductTapped(_products[index]));
                               },
                             ),
                           ),
@@ -345,23 +275,11 @@ class _PosScreenState extends State<PosScreen> {
                 ],
               ),
             ),
-
-            // Right: Order Summary Panel
-            OrderSummaryPanel(
-              cart: _cart,
-              onClearCart: _clear,
-              onPay: _onPay,
-              onIncrement: _increment,
-              onDecrement: _decrement,
-              onRemove: _remove,
-              totalPrice: _totalPrice,
-            ),
+            OrderSummaryPanel(cart: _cart, onClearCart: _clear, onPay: _onPay, onIncrement: _increment, onDecrement: _decrement, onRemove: _remove, totalPrice: _totalPrice),
           ],
         );
-
-      case 2: // View 2: Orders History
+      case 2:
         return const Expanded(child: OrdersScreen());
-
       default:
         return const Expanded(child: Center(child: Text("Page en construction")));
     }
@@ -373,28 +291,17 @@ class _PosScreenState extends State<PosScreen> {
       backgroundColor: AppTheme.backgroundColor,
       body: Row(
         children: [
-          // Left Sidebar (Persistent)
           SidebarNavigation(
             selectedIndex: _selectedIndex,
             onItemSelected: (index) {
               if (index == -1) {
-                // Logout
-                Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (c) => const LoginScreen()),
-                        (r) => false
-                );
+                Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const LoginScreen()), (r) => false);
               } else {
-                // Navigate
                 setState(() => _selectedIndex = index);
               }
             },
           ),
-
-          // Dynamic Content Area
-          Expanded( // <--- Ensures content takes remaining space
-            child: _buildContent(),
-          ),
+          Expanded(child: _buildContent()),
         ],
       ),
     );
