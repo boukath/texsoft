@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/models/order_model.dart';
 import '../../../core/services/database_service.dart';
 import '../../../common/theme/app_theme.dart';
+// Import the new dialog
+import '../widgets/order_detail_dialog.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({Key? key}) : super(key: key);
@@ -22,7 +24,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   void _refreshOrders() {
     setState(() {
-      // Calling the new method exposed by our Facade
       _ordersFuture = DatabaseService.instance.getAllOrders();
     });
   }
@@ -34,14 +35,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- Title ---
-          const Text(
-            "Historique des Commandes",
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Historique des Commandes",
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _refreshOrders,
+                tooltip: "Actualiser",
+              )
+            ],
           ),
           const SizedBox(height: 24),
 
-          // --- List of Orders ---
           Expanded(
             child: FutureBuilder<List<OrderModel>>(
               future: _ordersFuture,
@@ -84,7 +93,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           subtitle: Text(
-                            // Simple date formatting
                             order.date.toString().split('.')[0],
                             style: const TextStyle(color: AppTheme.textLight),
                           ),
@@ -103,8 +111,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               const Icon(Icons.chevron_right, color: Colors.grey),
                             ],
                           ),
+                          // --- NEW: Show the details dialog ---
                           onTap: () {
-                            // We will add "Order Details" later
+                            showDialog(
+                              context: context,
+                              builder: (context) => OrderDetailDialog(order: order),
+                            );
                           },
                         );
                       },
