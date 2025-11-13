@@ -12,16 +12,27 @@ class CategoryDao {
     return List.generate(maps.length, (i) => Category.fromMap(maps[i]));
   }
 
-  Future<void> createCategory(String name) async {
+  // Updated to accept printer name
+  Future<void> createCategory(String name, String? targetPrinter) async {
     final db = await _db;
-    await db.insert('Categories', {'name': name});
+    await db.insert('Categories', {
+      'name': name,
+      'targetPrinter': targetPrinter
+    });
   }
 
-  Future<void> updateCategory(int id, String newName) async {
+  // Updated to accept printer name
+  Future<void> updateCategory(int id, String newName, String? targetPrinter) async {
     final db = await _db;
-    await db.update('Categories', {'name': newName}, where: 'id = ?', whereArgs: [id]);
+    await db.update(
+        'Categories',
+        {'name': newName, 'targetPrinter': targetPrinter},
+        where: 'id = ?',
+        whereArgs: [id]
+    );
   }
 
+  // ... (deleteCategory and getProductCountForCategory remain the same) ...
   Future<void> deleteCategory(int id) async {
     final db = await _db;
     await db.delete('Categories', where: 'id = ?', whereArgs: [id]);
@@ -29,10 +40,7 @@ class CategoryDao {
 
   Future<int> getProductCountForCategory(int categoryId) async {
     final db = await _db;
-    final result = await db.rawQuery(
-      'SELECT COUNT(*) FROM Products WHERE categoryId = ?',
-      [categoryId],
-    );
+    final result = await db.rawQuery('SELECT COUNT(*) FROM Products WHERE categoryId = ?', [categoryId]);
     return Sqflite.firstIntValue(result) ?? 0;
   }
 }

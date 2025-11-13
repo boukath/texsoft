@@ -40,10 +40,17 @@ class DatabaseService {
   Future<void> deleteUser(int id) => _userDao.deleteUser(id);
   Future<User?> getUserByUsername(String u) => _userDao.getUserByUsername(u);
 
-  // ================= CATEGORY METHODS =================
+  // ================= CATEGORY METHODS (UPDATED) =================
   Future<List<Category>> getCategories() => _categoryDao.getCategories();
-  Future<void> createCategory(String name) => _categoryDao.createCategory(name);
-  Future<void> updateCategory(int id, String name) => _categoryDao.updateCategory(id, name);
+
+  // Fixed: Added targetPrinter parameter
+  Future<void> createCategory(String name, String? targetPrinter) =>
+      _categoryDao.createCategory(name, targetPrinter);
+
+  // Fixed: Added targetPrinter parameter
+  Future<void> updateCategory(int id, String name, String? targetPrinter) =>
+      _categoryDao.updateCategory(id, name, targetPrinter);
+
   Future<void> deleteCategory(int id) => _categoryDao.deleteCategory(id);
   Future<int> getProductCountForCategory(int id) => _categoryDao.getProductCountForCategory(id);
 
