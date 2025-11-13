@@ -27,6 +27,7 @@ class OrderSummaryPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 350,
+      height: double.infinity, // <--- THIS FIXES THE ERROR (Forces full height)
       color: Colors.white,
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -71,6 +72,8 @@ class OrderSummaryPanel extends StatelessWidget {
           const SizedBox(height: 10),
 
           // --- Cart Items List ---
+          // This Expanded caused the crash because the parent didn't have a height.
+          // Now that Container has height: double.infinity, this works!
           Expanded(
             child: cart.isEmpty
                 ? const Center(child: Text("Le panier est vide"))
@@ -93,7 +96,7 @@ class OrderSummaryPanel extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            "${item.variant.price.toStringAsFixed(2)} DZD", // Updated to DZD
+                            "${item.variant.price.toStringAsFixed(2)} DZD",
                             style: const TextStyle(color: AppTheme.textLight, fontSize: 12),
                           ),
                         ],
@@ -121,7 +124,7 @@ class OrderSummaryPanel extends StatelessWidget {
           // --- Totals ---
           _buildSummaryRow("Sous-total", "${totalPrice.toStringAsFixed(2)} DZD"),
           const SizedBox(height: 8),
-          _buildSummaryRow("TVA (19%)", "${(totalPrice * 0.19).toStringAsFixed(2)} DZD"), // Adjusted tax to generic 19% or keep 10% as preferred
+          _buildSummaryRow("TVA (19%)", "${(totalPrice * 0.19).toStringAsFixed(2)} DZD"),
           const SizedBox(height: 16),
           const Divider(endIndent: 100),
           Row(
@@ -129,13 +132,13 @@ class OrderSummaryPanel extends StatelessWidget {
             children: [
               const Text("Total", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               Text(
-                "${(totalPrice * 1.19).toStringAsFixed(2)} DZD", // Updated to DZD
+                "${(totalPrice * 1.19).toStringAsFixed(2)} DZD",
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
               ),
             ],
           ),
 
-          const Spacer(), // Push button to bottom
+          const SizedBox(height: 24),
 
           // --- Pay Button ---
           SizedBox(

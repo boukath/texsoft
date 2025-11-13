@@ -3,7 +3,14 @@ import 'package:flutter/material.dart';
 import '../../../common/theme/app_theme.dart';
 
 class SidebarNavigation extends StatelessWidget {
-  const SidebarNavigation({Key? key}) : super(key: key);
+  final int selectedIndex;
+  final Function(int) onItemSelected;
+
+  const SidebarNavigation({
+    Key? key,
+    required this.selectedIndex,
+    required this.onItemSelected,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +21,7 @@ class SidebarNavigation extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Logo
+          // --- Logo ---
           Row(
             children: [
               Container(
@@ -34,23 +41,30 @@ class SidebarNavigation extends StatelessWidget {
           ),
           const SizedBox(height: 40),
 
-          // Navigation Items (Translated)
-          _buildNavItem(Icons.dashboard_outlined, "Tableau de bord", false),
-          _buildNavItem(Icons.restaurant_menu, "Menu", true), // Selected
-          _buildNavItem(Icons.receipt_long_outlined, "Commandes", false),
-          _buildNavItem(Icons.people_outline, "Clients", false),
-          _buildNavItem(Icons.analytics_outlined, "Statistiques", false),
+          // --- Menu Items ---
+          // 0: Dashboard (Tableau de bord)
+          _buildNavItem(0, Icons.dashboard_outlined, "Tableau de bord"),
+          // 1: Menu (The POS Grid)
+          _buildNavItem(1, Icons.restaurant_menu, "Menu"),
+          // 2: Orders (The History) - THIS IS THE NEW BUTTON
+          _buildNavItem(2, Icons.receipt_long_outlined, "Commandes"),
+          // 3: Clients
+          _buildNavItem(3, Icons.people_outline, "Clients"),
+          // 4: Analytics
+          _buildNavItem(4, Icons.analytics_outlined, "Statistiques"),
 
           const Spacer(),
 
-          _buildNavItem(Icons.settings_outlined, "Paramètres", false),
-          _buildNavItem(Icons.logout, "Déconnexion", false, isLogout: true),
+          // --- Bottom Items ---
+          _buildNavItem(5, Icons.settings_outlined, "Paramètres"),
+          _buildLogoutItem(context),
         ],
       ),
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, bool isSelected, {bool isLogout = false}) {
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    final isSelected = index == selectedIndex;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -60,19 +74,31 @@ class SidebarNavigation extends StatelessWidget {
       child: ListTile(
         leading: Icon(
             icon,
-            color: isSelected ? AppTheme.primaryColor : (isLogout ? Colors.red : AppTheme.textLight)
+            color: isSelected ? AppTheme.primaryColor : AppTheme.textLight
         ),
         title: Text(
           label,
           style: TextStyle(
-            color: isSelected ? AppTheme.primaryColor : (isLogout ? Colors.red : AppTheme.textLight),
+            color: isSelected ? AppTheme.primaryColor : AppTheme.textLight,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
           ),
         ),
-        onTap: () {
-          // Add navigation logic here later
-        },
+        onTap: () => onItemSelected(index),
       ),
+    );
+  }
+
+  Widget _buildLogoutItem(BuildContext context) {
+    return ListTile(
+      leading: const Icon(Icons.logout, color: Colors.red),
+      title: const Text(
+        "Déconnexion",
+        style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+      ),
+      onTap: () {
+        // We pass -1 to signal a logout
+        onItemSelected(-1);
+      },
     );
   }
 }
