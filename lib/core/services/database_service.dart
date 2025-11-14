@@ -18,6 +18,10 @@ import '../models/variant_model.dart';
 import '../models/cart_item_model.dart';
 import '../models/order_model.dart';
 import '../models/order_item_model.dart';
+// Import new analytics models
+import '../models/analytics/sales_summary.dart';
+import '../models/analytics/hourly_sales.dart';
+import '../models/analytics/top_seller.dart';
 
 class DatabaseService {
   // Singleton
@@ -40,17 +44,10 @@ class DatabaseService {
   Future<void> deleteUser(int id) => _userDao.deleteUser(id);
   Future<User?> getUserByUsername(String u) => _userDao.getUserByUsername(u);
 
-  // ================= CATEGORY METHODS (UPDATED) =================
+  // ================= CATEGORY METHODS =================
   Future<List<Category>> getCategories() => _categoryDao.getCategories();
-
-  // Fixed: Added targetPrinter parameter
-  Future<void> createCategory(String name, String? targetPrinter) =>
-      _categoryDao.createCategory(name, targetPrinter);
-
-  // Fixed: Added targetPrinter parameter
-  Future<void> updateCategory(int id, String name, String? targetPrinter) =>
-      _categoryDao.updateCategory(id, name, targetPrinter);
-
+  Future<void> createCategory(String name, String? targetPrinter) => _categoryDao.createCategory(name, targetPrinter);
+  Future<void> updateCategory(int id, String name, String? targetPrinter) => _categoryDao.updateCategory(id, name, targetPrinter);
   Future<void> deleteCategory(int id) => _categoryDao.deleteCategory(id);
   Future<int> getProductCountForCategory(int id) => _categoryDao.getProductCountForCategory(id);
 
@@ -71,4 +68,14 @@ class DatabaseService {
   Future<void> createOrder(int uid, List<CartItem> items, double total) => _orderDao.createOrder(uid, items, total);
   Future<List<OrderModel>> getAllOrders() => _orderDao.getAllOrders();
   Future<List<OrderItemModel>> getOrderItems(int id) => _orderDao.getOrderItems(id);
+
+  // ================= ANALYTICS METHODS (NEW) =================
+  Future<SalesSummary> getTodaySalesSummary() =>
+      _orderDao.getTodaySalesSummary();
+
+  Future<List<HourlySale>> getTodaySalesByHour() =>
+      _orderDao.getTodaySalesByHour();
+
+  Future<List<TopSeller>> getTopSellingProducts({int limit = 5}) =>
+      _orderDao.getTopSellingProducts(limit);
 }

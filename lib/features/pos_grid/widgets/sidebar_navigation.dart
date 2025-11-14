@@ -1,19 +1,26 @@
 // lib/features/pos_grid/widgets/sidebar_navigation.dart
 import 'package:flutter/material.dart';
 import '../../../common/theme/app_theme.dart';
+import '../../../core/models/user_model.dart'; // <-- Importez le modèle User
+import '../../../core/models/role_model.dart'; // <-- Importez le modèle Role
 
 class SidebarNavigation extends StatelessWidget {
   final int selectedIndex;
   final Function(int) onItemSelected;
+  final User loggedInUser; // <-- Ajoutez l'utilisateur connecté
 
   const SidebarNavigation({
     Key? key,
     required this.selectedIndex,
     required this.onItemSelected,
+    required this.loggedInUser, // <-- Ajoutez au constructeur
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // Déterminez si l'utilisateur est un admin
+    final bool isAdmin = loggedInUser.role == UserRole.admin;
+
     return Container(
       width: 250,
       color: AppTheme.sidebarColor,
@@ -41,22 +48,27 @@ class SidebarNavigation extends StatelessWidget {
           ),
           const SizedBox(height: 40),
 
-          // --- Menu Items ---
-          // 0: Dashboard (Tableau de bord)
+          // --- Menu Items (Pour tous) ---
+          // 0: Tableau de bord
           _buildNavItem(0, Icons.dashboard_outlined, "Tableau de bord"),
-          // 1: Menu (The POS Grid)
+          // 1: Menu (Caisse)
           _buildNavItem(1, Icons.restaurant_menu, "Menu"),
-          // 2: Orders (The History) - THIS IS THE NEW BUTTON
+          // 2: Commandes (Historique)
           _buildNavItem(2, Icons.receipt_long_outlined, "Commandes"),
-          // 3: Clients
-          _buildNavItem(3, Icons.people_outline, "Clients"),
-          // 4: Analytics
-          _buildNavItem(4, Icons.analytics_outlined, "Statistiques"),
+
+          // --- Section Admin (Conditionnelle) ---
+          if (isAdmin)
+            _buildNavItem(3, Icons.people_outline, "Clients"),
+          if (isAdmin)
+            _buildNavItem(4, Icons.analytics_outlined, "Statistiques"),
 
           const Spacer(),
 
-          // --- Bottom Items ---
-          _buildNavItem(5, Icons.settings_outlined, "Paramètres"),
+          // --- Section Admin (Conditionnelle) ---
+          if (isAdmin)
+            _buildNavItem(5, Icons.settings_outlined, "Paramètres"),
+
+          // --- Déconnexion (Pour tous) ---
           _buildLogoutItem(context),
         ],
       ),
@@ -96,7 +108,7 @@ class SidebarNavigation extends StatelessWidget {
         style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
       ),
       onTap: () {
-        // We pass -1 to signal a logout
+        // Signale au parent de se déconnecter
         onItemSelected(-1);
       },
     );
